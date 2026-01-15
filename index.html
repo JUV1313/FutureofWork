@@ -1,0 +1,1206 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Future of Jobs, Plan Builder (MVP)</title>
+
+    <!-- React 18 -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Tailwind -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+
+    <style>
+      @media print {
+        .no-print { display: none !important; }
+        .print-area { padding: 0 !important; }
+        body { background: white !important; }
+      }
+    </style>
+  </head>
+
+  <body class="min-h-screen bg-gray-50 text-gray-900">
+    <div id="root"></div>
+
+    <script type="text/babel">
+      const { useMemo, useState, useEffect } = React;
+
+      /* =========================
+         0) DATA (MVP seed)
+         ========================= */
+
+      const REPORT_SOURCES = {
+        globalChurn: {
+          label: "WEF Future of Jobs Report 2025, Figure 2.1 (Jobs created/displaced, net, churn)",
+          ref: "FoJ 2025, Fig 2.1"
+        },
+        aiTransform: {
+          label: "WEF Future of Jobs Report 2025, Figure 1.2 (AI & info processing expected to transform business, 86%)",
+          ref: "FoJ 2025, Fig 1.2"
+        },
+        rolesFastest: {
+          label: "WEF Future of Jobs Report 2025, Figure 2.2 (Fastest-growing and fastest-declining roles)",
+          ref: "FoJ 2025, Fig 2.2"
+        },
+        israelProfileText: {
+          label: "WEF Future of Jobs Report 2025, Israel economy profile narrative (drivers, strategies, skills)",
+          ref: "FoJ 2025, Israel profile narrative"
+        },
+        israelProfileStats: {
+          label: "WEF Future of Jobs Report 2025, Israel economy profile stats (churn, skill disruption etc.)",
+          ref: "FoJ 2025, Israel profile stats"
+        }
+      };
+
+      const GLOBAL_HERO = {
+        jobsCreatedM: 170,
+        jobsDisplacedM: 92,
+        netGrowthM: 78,
+        churnPct: 22,
+        datasetFormalJobsB: 1.2,
+        sourceKey: "globalChurn"
+      };
+
+      const MACROTRENDS = [
+        {
+          id: "tech",
+          title: "טכנולוגיה, במיוחד AI ועיבוד מידע",
+          what: "התפשטות כלים דיגיטליים, אוטומציה ו GenAI משנה משימות, מיומנויות ותפקידים.",
+          why: "חלק עצום מהמעסיקים מצפה להשפעה טרנספורמטיבית עד 2030.",
+          pushes: {
+            roles: ["AI & Machine Learning Specialists", "Big Data Specialists", "Software and Applications Developers", "Information Security Analysts"],
+            skills: ["AI וביג דאטה", "אוריינות טכנולוגית", "סייבר ורשתות", "חשיבה אנליטית"]
+          },
+          sourceKey: "aiTransform"
+        },
+        {
+          id: "green",
+          title: "מעבר ירוק ואנרגיה",
+          what: "השקעות בהפחתת פליטות, התאמה לאקלים ואנרגיה נקייה יוצרות ביקוש חדש.",
+          why: "זה מזיז תעשיות, רגולציה, שרשראות אספקה ותפקידים הנדסיים ותפעוליים.",
+          pushes: {
+            roles: ["Renewable Energy Engineers", "Environmental Engineers", "Sustainability Specialists"],
+            skills: ["Environmental stewardship", "חשיבה מערכתית", "ניהול פרויקטים"]
+          }
+        },
+        {
+          id: "geoecon",
+          title: "שיבושים גיאו-כלכליים וביטחון",
+          what: "קיטוב, סנקציות, סיכוני סייבר, ושרשראות אספקה פחות יציבות.",
+          why: "דוחף תפקידי ביטחון מידע וניהול סיכונים, וגם שינוי אסטרטגיות עסקיות.",
+          pushes: {
+            roles: ["Security Management Specialists", "Risk Management Specialists", "Information Security Analysts"],
+            skills: ["סייבר ורשתות", "ניהול סיכונים", "חשיבה מערכתית"]
+          }
+        },
+        {
+          id: "econ",
+          title: "אי ודאות כלכלית ויוקר מחיה",
+          what: "שינויי מחירים, אינפלציה, צמיחה איטית, לחץ על פריון.",
+          why: "מגדיל לחץ לאוטומציה ולהתייעלות, ומעלה ערך למיומנויות הסתגלות.",
+          pushes: {
+            roles: ["Project Managers", "Business Development Professionals", "Process Automation Specialists"],
+            skills: ["חוסן וגמישות", "חשיבה ביקורתית", "ניהול פרויקטים"]
+          }
+        },
+        {
+          id: "demo",
+          title: "דמוגרפיה",
+          what: "הזדקנות אוכלוסייה במדינות מסוימות, גידול במדינות אחרות.",
+          why: "משפיע על care jobs, חינוך, פריון, ומבנה מיומנויות במשק.",
+          pushes: {
+            roles: ["Personal Care Aides", "Nursing Professionals", "Social Work and Counselling Professionals"],
+            skills: ["אמפתיה והקשבה", "חוסן וגמישות", "למידה מתמשכת"]
+          }
+        }
+      ];
+
+      const SKILLS = [
+        {
+          id: "ai_bigdata",
+          name: "AI וביג דאטה",
+          simple: "להבין איך להשתמש בכלי AI ונתונים כדי לקבל החלטות, לבנות תוצרים ולשפר עבודה.",
+          checks: ["האם אתה יודע לנסח פרומפטים טובים?", "האם אתה יודע לאמת תוצרים?", "האם אתה יודע לעבוד עם טבלאות/דאשבורדים?"],
+          paths: {
+            "4w": ["15 דק ביום: אימון פרומפטינג", "2 פעמים בשבוע: בניית תוצר קטן עם AI", "פעם בשבוע: שיפור תהליך עבודה אמיתי"],
+            "8w": ["פרויקט: אוטומציה קטנה בעבודה", "תיק עבודות: 3 דוגמאות לפני ואחרי", "שגרת אימות: צ’ק ליסט איכות"]
+          }
+        },
+        {
+          id: "resilience",
+          name: "חוסן, גמישות וזריזות",
+          simple: "להתאושש מהר, לשנות כיוון בלי דרמה, ולהמשיך לתפקד טוב תחת שינוי.",
+          checks: ["איך אתה מגיב כשמשנים לך יעד?", "האם אתה יודע לפרק שינוי למשימות קטנות?"],
+          paths: {
+            "4w": ["טקס שבועי: רטרוספקטיבה קצרה", "חשיפה קטנה: ללמוד כלי חדש", "שיחת פידבק אחת יזומה"],
+            "8w": ["פרויקט: שינוי תהליך קטן בצוות", "תרגול: ניהול לחץ בזמן אמת", "סיסטם: יומן ניסויים שבועי"]
+          }
+        },
+        {
+          id: "curiosity",
+          name: "סקרנות ולמידה מתמדת",
+          simple: "יכולת ללמוד מהר באופן עצמאי ולשמור על קצב עדכון קבוע.",
+          checks: ["האם יש לך שגרת למידה?", "האם אתה מסיים דברים או רק מתחיל?"],
+          paths: {
+            "4w": ["30 דק פעמיים בשבוע: למידה ממוקדת", "סיכום בכתב: 5 נקודות", "יישום: דבר אחד בעבודה"],
+            "8w": ["מסלול: קורס קצר + פרויקט", "קהילה: שיתוף פעם בשבוע", "תיק: דף ‘מה למדתי’"]
+          }
+        },
+        {
+          id: "systems",
+          name: "חשיבה מערכתית",
+          simple: "לראות קשרים בין חלקים, לזהות לולאות משוב, ולבנות פתרונות שלא שוברים משהו אחר.",
+          checks: ["האם אתה יודע למפות תהליך?", "האם אתה חושב על השלכות שני צעדים קדימה?"],
+          paths: {
+            "4w": ["מפה: תהליך אחד בעבודה", "זיהוי צוואר בקבוק", "ניסוי: שינוי קטן ומדידה"],
+            "8w": ["פרויקט: מדדים לתהליך", "רטרוספקטיבה: מה השתנה ולמה", "תיק: תרשים מערכת + תובנות"]
+          }
+        },
+        {
+          id: "cyber",
+          name: "סייבר ורשתות",
+          simple: "עקרונות הגנה, סיכונים בסיסיים, והיגיינת אבטחה בעבודה דיגיטלית.",
+          checks: ["האם אתה מזהה פישינג?", "האם אתה עובד עם הרשאות וסיסמאות נכון?"],
+          paths: {
+            "4w": ["מודעות: 10 דק ביום על סיכונים", "הקשחה: MFA בכל מקום", "צ’ק ליסט אבטחה שבועי"],
+            "8w": ["פרויקט: נוהל אבטחה לצוות", "תרגיל: סימולציית פישינג פנימית", "תיעוד: דף מדיניות קצר"]
+          }
+        }
+      ];
+
+      // Taken from the report’s “fastest-growing” and “fastest-declining” examples
+      const ROLES = [
+        // Growing
+        { id: "big_data", name: "Big Data Specialists", trend: "growing", family: "Data & AI" },
+        { id: "fintech", name: "FinTech Engineers", trend: "growing", family: "Engineering" },
+        { id: "ai_ml", name: "AI and Machine Learning Specialists", trend: "growing", family: "Data & AI" },
+        { id: "software_dev", name: "Software and Applications Developers", trend: "growing", family: "Software" },
+        { id: "sec_mgmt", name: "Security Management Specialists", trend: "growing", family: "Security" },
+        { id: "infosec", name: "Information Security Analysts", trend: "growing", family: "Security" },
+        { id: "ux", name: "UI and UX Designers", trend: "growing", family: "Design" },
+        // Declining
+        { id: "data_entry", name: "Data Entry Clerks", trend: "declining", family: "Clerical" },
+        { id: "admin_assist", name: "Administrative Assistants and Executive Secretaries", trend: "declining", family: "Clerical" },
+        { id: "telemarketers", name: "Telemarketers", trend: "declining", family: "Sales Ops" },
+        { id: "cashiers", name: "Cashiers and Ticket Clerks", trend: "declining", family: "Clerical" },
+        { id: "bank_tellers", name: "Bank Tellers and Related Clerks", trend: "declining", family: "Clerical" }
+      ];
+
+      const COUNTRIES = [
+        {
+          id: "israel",
+          name: "ישראל",
+          region: "מזרח תיכון",
+          churnPct: 38, // from profile snippet
+          skillDisruptionPct: 88, // from profile snippet
+          drivers: [
+            { name: "הרחבת גישה דיגיטלית", note: "מניע מרכזי בעסקים", sourceKey: "israelProfileText" },
+            { name: "עליית יוקר מחיה, אינפלציה ולחץ מחירים", note: "מניע מרכזי בעסקים", sourceKey: "israelProfileText" },
+            { name: "התמקדות גוברת בסוגיות עבודה וחברה", note: "מעל הממוצע העולמי", sourceKey: "israelProfileText" },
+            { name: "רגולציית תחרות ואנטי-טראסט מחמירה", note: "מעל הממוצע העולמי", sourceKey: "israelProfileText" }
+          ],
+          risingSkills: ["חוסן, גמישות וזריזות", "חשיבה מערכתית", "AI וביג דאטה", "סייבר ורשתות"],
+          employerStrategies: [
+            "גיוס טאלנט עם כישורים מתהווים",
+            "האצת אוטומציה",
+            "הכשרות ושדרוג מיומנויות",
+            "התארגנות מחדש כדי לנצל הזדמנויות עסקיות מבוססות AI"
+          ],
+          sourceKeys: ["israelProfileText", "israelProfileStats"]
+        },
+        {
+          id: "usa",
+          name: "ארה״ב",
+          region: "צפון אמריקה",
+          churnPct: null,
+          skillDisruptionPct: null,
+          drivers: [
+            { name: "מגמות טכנולוגיות", note: "AI ועיבוד מידע בולט", sourceKey: "aiTransform" },
+            { name: "היערכות אקלימית", note: "מוזכרת בפרופילים אזוריים", sourceKey: "aiTransform" }
+          ],
+          risingSkills: ["AI וביג דאטה", "אוריינות טכנולוגית", "ניהול פרויקטים"],
+          employerStrategies: ["הכשרות", "אוטומציה", "גיוס כישורים חדשים"],
+          sourceKeys: ["aiTransform"]
+        },
+        {
+          id: "canada",
+          name: "קנדה",
+          region: "צפון אמריקה",
+          churnPct: null,
+          skillDisruptionPct: null,
+          drivers: [
+            { name: "דיגיטליזציה", note: "מגמה מרכזית באזור", sourceKey: "aiTransform" },
+            { name: "שיבושים גיאו-כלכליים", note: "שרשראות אספקה משתנות", sourceKey: "aiTransform" }
+          ],
+          risingSkills: ["AI וביג דאטה", "סייבר ורשתות", "חשיבה מערכתית"],
+          employerStrategies: ["הכשרות", "שיפור מסלולי התקדמות", "גיוס כישורים חדשים"],
+          sourceKeys: ["aiTransform"]
+        }
+      ];
+
+      const ROLE_TO_SKILLS = {
+        "Big Data Specialists": ["ai_bigdata", "systems", "curiosity"],
+        "AI and Machine Learning Specialists": ["ai_bigdata", "systems", "curiosity"],
+        "Software and Applications Developers": ["ai_bigdata", "systems", "cyber"],
+        "Information Security Analysts": ["cyber", "systems", "curiosity"],
+        "UI and UX Designers": ["systems", "curiosity", "resilience"],
+        "Data Entry Clerks": ["ai_bigdata", "curiosity"],
+        "Administrative Assistants and Executive Secretaries": ["ai_bigdata", "systems", "resilience"],
+        "Telemarketers": ["curiosity", "resilience"]
+      };
+
+      const ADJACENT_ROLES = {
+        "Data Entry Clerks": [
+          { name: "Data Analysts and Scientists", why: "מעבר טבעי דרך שדרוג נתונים ו AI", skills: ["ai_bigdata", "systems"] },
+          { name: "Process Automation Specialists", why: "אותו עולם של תהליכים, יותר אוטומציה", skills: ["ai_bigdata", "systems"] }
+        ],
+        "Administrative Assistants and Executive Secretaries": [
+          { name: "Project Managers", why: "ניהול תיאומים הופך לניהול תהליכים", skills: ["systems", "resilience"] },
+          { name: "Digital Transformation Specialists", why: "למנף דיגיטל ואוטומציה לתפקיד חדש", skills: ["ai_bigdata", "systems"] }
+        ]
+      };
+
+      /* =========================
+         1) UTILITIES
+         ========================= */
+
+      function cn(...classes) {
+        return classes.filter(Boolean).join(" ");
+      }
+
+      function percentBadge(value) {
+        if (value === null || value === undefined) return "לא זמין";
+        return value + "%";
+      }
+
+      function clamp(n, min, max) {
+        return Math.max(min, Math.min(max, n));
+      }
+
+      function uniq(arr) {
+        return Array.from(new Set(arr));
+      }
+
+      function scoreToLabel(score) {
+        if (score >= 70) return { label: "גבוה", color: "bg-red-100 text-red-800 border-red-200" };
+        if (score >= 40) return { label: "בינוני", color: "bg-yellow-100 text-yellow-800 border-yellow-200" };
+        return { label: "נמוך", color: "bg-green-100 text-green-800 border-green-200" };
+      }
+
+      /* =========================
+         2) RECOMMENDER (transparent)
+         ========================= */
+
+      function buildPlan({ countryId, roleName, experience, orientation, hoursPerWeek, learningStyle, selfRatings }) {
+        const country = COUNTRIES.find(c => c.id === countryId) || COUNTRIES[0];
+        const role = ROLES.find(r => r.name === roleName);
+        const roleTrend = role ? role.trend : "unknown";
+
+        // 1) Exposure to change (mostly tech exposure context)
+        // Simple heuristic: everyone gets a baseline because AI & info processing are expected to transform many businesses.
+        // Then bump up if role is in “Data & AI”, “Software”, “Security”
+        let exposure = 55;
+        if (role && ["Data & AI", "Software", "Security"].includes(role.family)) exposure += 20;
+        if (orientation === "טכנולוגי") exposure += 10;
+        if (countryId === "israel") exposure += 5; // Israel profile emphasizes digital access + AI opportunity orientation
+        exposure = clamp(exposure, 0, 100);
+
+        // 2) Market direction risk
+        let marketRisk = 35;
+        if (roleTrend === "declining") marketRisk = 75;
+        if (roleTrend === "growing") marketRisk = 25;
+
+        // 3) Skill gap
+        // Determine target skill set: global rising set + country emphasis + role mapping
+        const countrySkillMap = {
+          israel: ["resilience", "systems", "ai_bigdata", "cyber"],
+          usa: ["ai_bigdata", "systems"],
+          canada: ["ai_bigdata", "cyber", "systems"]
+        };
+
+        const roleSkillIds = ROLE_TO_SKILLS[roleName] || [];
+        const targetSkillIds = uniq([
+          ...countrySkillMap[countryId] || [],
+          ...roleSkillIds,
+          "curiosity"
+        ]);
+
+        // selfRatings is a map skillId -> 1..5
+        const gaps = targetSkillIds
+          .map(id => {
+            const rating = Number(selfRatings[id] || 0);
+            const gap = clamp(6 - rating, 1, 5); // lower rating => larger gap
+            return { id, rating: rating || 0, gap };
+          })
+          .sort((a, b) => b.gap - a.gap);
+
+        const topSkills = gaps.slice(0, 3).map(g => g.id);
+
+        // Projects: tailored by orientation + top skills
+        const projects = recommendProjects({ topSkills, roleTrend, orientation });
+
+        // Adjacent roles if declining or unknown
+        const adjacent = (roleTrend === "declining" || roleTrend === "unknown")
+          ? (ADJACENT_ROLES[roleName] || [
+              { name: "Project Managers", why: "תפקיד סמוך בהרבה תחומים, במיוחד כשמתחילים לנהל תהליכים", skills: ["systems", "resilience"] }
+            ])
+          : [
+              { name: "Product Managers", why: "תפקיד סמוך לתפקידי טק ודאטה, אם יש נטייה לאנשים ותעדוף", skills: ["systems", "resilience", "curiosity"] }
+            ];
+
+        const overallRisk = clamp(
+          Math.round(0.45 * marketRisk + 0.35 * exposure + 0.20 * avgGapScore(gaps)),
+          0, 100
+        );
+
+        const why = buildWhy({ country, roleTrend, exposure, roleName });
+
+        return {
+          meta: { country, roleName, experience, orientation, hoursPerWeek, learningStyle },
+          scores: { exposure, marketRisk, gapScore: avgGapScore(gaps), overallRisk },
+          outputs: { topSkills, projects, adjacent },
+          explain: why
+        };
+      }
+
+      function avgGapScore(gaps) {
+        if (!gaps.length) return 40;
+        const avgGap = gaps.reduce((acc, g) => acc + g.gap, 0) / gaps.length; // 1..5
+        return clamp(Math.round((avgGap / 5) * 100), 0, 100);
+      }
+
+      function recommendProjects({ topSkills, roleTrend, orientation }) {
+        const hasAI = topSkills.includes("ai_bigdata");
+        const hasSystems = topSkills.includes("systems");
+        const hasCyber = topSkills.includes("cyber");
+
+        const base = [];
+
+        if (hasAI) {
+          base.push({
+            title: "מיני-פרויקט: ‘עוזר עבודה’ אישי",
+            desc: "בנה תהליך קטן שעושה לך חיים קלים, סיכום מיילים, טבלת משימות, תבנית הצעות, ניתוח נתונים פשוט.",
+            time: "2-4 שעות"
+          });
+        }
+        if (hasSystems) {
+          base.push({
+            title: "מיפוי תהליך + שיפור מדיד",
+            desc: "בחר תהליך אחד בעבודה, צייר אותו, מצא צוואר בקבוק, עשה שינוי אחד, מדוד תוצאה.",
+            time: "2-6 שעות"
+          });
+        }
+        if (hasCyber) {
+          base.push({
+            title: "צ’ק ליסט אבטחה לצוות",
+            desc: "רשימת ‘היגיינת אבטחה’ בסיסית, MFA, הרשאות, שיתוף קבצים, סימולציית פישינג קצרה.",
+            time: "2-5 שעות"
+          });
+        }
+
+        if (!base.length) {
+          base.push({
+            title: "תיק עבודות: 3 ‘לפני ואחרי’",
+            desc: "בחר 3 משימות חוזרות, תיעד ‘לפני’, שפר עם כלי/שיטה, ותיעד ‘אחרי’.",
+            time: "3-6 שעות"
+          });
+        }
+
+        // A little tonal tweak
+        if (roleTrend === "declining") {
+          base.unshift({
+            title: "פרויקט מעבר: ‘אותו תחום, רמה אחת למעלה’",
+            desc: "קח משימה מהתפקיד הנוכחי ובנה לה גרסה ‘חכמה’ יותר, אוטומציה, דאשבורד, תהליך.",
+            time: "3-8 שעות"
+          });
+        }
+
+        if (orientation === "אנשים") {
+          base.push({
+            title: "פרויקט: מנטורינג קצר",
+            desc: "בחר אדם אחד, תן לו 3 מפגשים ממוקדי מטרה, תיעד תהליך ושיפור.",
+            time: "3-6 שעות"
+          });
+        }
+
+        return base.slice(0, 2);
+      }
+
+      function buildWhy({ country, roleTrend, exposure, roleName }) {
+        const items = [];
+
+        items.push({
+          title: "חשיפה לשינוי טכנולוגי",
+          text: "רוב הארגונים מצפים להשפעה משמעותית של AI ועיבוד מידע עד 2030, לכן יש לך נקודת פתיחה שבה ‘אוריינות AI’ היא בסיס.",
+          source: REPORT_SOURCES.aiTransform
+        });
+
+        if (roleTrend === "declining") {
+          items.push({
+            title: "כיוון שוק לתפקיד",
+            text: "התפקיד שלך מופיע כדוגמה לתפקידים בדעיכה מהירה, לכן ההמלצות מתמקדות בשדרוג מיומנויות ובתפקידים סמוכים, בלי פאניקה.",
+            source: REPORT_SOURCES.rolesFastest
+          });
+        } else if (roleTrend === "growing") {
+          items.push({
+            title: "כיוון שוק לתפקיד",
+            text: "התפקיד שלך מופיע כדוגמה לתפקידים בצמיחה מהירה, אז הדגש הוא על בניית יתרון ולא על ‘בריחה’.",
+            source: REPORT_SOURCES.rolesFastest
+          });
+        } else {
+          items.push({
+            title: "כיוון שוק לתפקיד",
+            text: "אין לנו התאמה חד-חד ערכית ברשימת הדוגמה, לכן אנחנו עובדים ‘Skill-first’ עם דגש על מיומנויות על.",
+            source: REPORT_SOURCES.rolesFastest
+          });
+        }
+
+        if (country.id === "israel") {
+          items.push({
+            title: "התאמה למדינה",
+            text: "בישראל מודגשים כמנועים הרחבת גישה דיגיטלית ועליית יוקר מחיה, ובאסטרטגיות בולטות אוטומציה, גיוס כישורים חדשים והכשרות, עם דגש על חוסן וחשיבה מערכתית.",
+            source: REPORT_SOURCES.israelProfileText
+          });
+        }
+
+        items.push({
+          title: "הקשר מרגיע, בלי לייפות",
+          text: `הדוח מתאר תנועה מבנית בשוק: יצירה של ${GLOBAL_HERO.jobsCreatedM} מיליון משרות מול דחיקה של ${GLOBAL_HERO.jobsDisplacedM} מיליון, נטו ${GLOBAL_HERO.netGrowthM} מיליון, עם churn של ${GLOBAL_HERO.churnPct}%.`,
+          source: REPORT_SOURCES.globalChurn
+        });
+
+        return items;
+      }
+
+      /* =========================
+         3) UI COMPONENTS
+         ========================= */
+
+      function TopNav({ route, setRoute }) {
+        const items = [
+          { id: "explore", label: "מפת העתיד" },
+          { id: "country", label: "לפי מדינה" },
+          { id: "roles", label: "תפקידים" },
+          { id: "skills", label: "מיומנויות" },
+          { id: "plan", label: "המסלול שלי" }
+        ];
+
+        return (
+          <div class="no-print sticky top-0 z-20 bg-white border-b">
+            <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gray-900 text-white flex items-center justify-center font-bold">FJ</div>
+                <div>
+                  <div class="font-bold">Future of Jobs, Plan Builder</div>
+                  <div class="text-xs text-gray-500">MVP מבוסס דוח WEF 2025</div>
+                </div>
+              </div>
+
+              <div class="hidden md:flex items-center gap-2">
+                {items.map(it => (
+                  <button
+                    key={it.id}
+                    onClick={() => setRoute(it.id)}
+                    class={cn(
+                      "px-3 py-2 rounded-lg text-sm border transition",
+                      route === it.id ? "bg-gray-900 text-white border-gray-900" : "bg-white hover:bg-gray-50 border-gray-200"
+                    )}
+                  >
+                    {it.label}
+                  </button>
+                ))}
+              </div>
+
+              <div class="md:hidden">
+                <select
+                  class="border rounded-lg px-3 py-2"
+                  value={route}
+                  onChange={(e) => setRoute(e.target.value)}
+                >
+                  {items.map(it => <option key={it.id} value={it.id}>{it.label}</option>)}
+                </select>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      function Card({ title, children, right }) {
+        return (
+          <div class="bg-white border border-gray-200 rounded-2xl shadow-sm">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-start justify-between gap-3">
+              <div class="font-bold">{title}</div>
+              {right}
+            </div>
+            <div class="px-5 py-4">{children}</div>
+          </div>
+        );
+      }
+
+      function Pill({ children, tone = "neutral" }) {
+        const map = {
+          neutral: "bg-gray-100 text-gray-800 border-gray-200",
+          good: "bg-green-100 text-green-800 border-green-200",
+          warn: "bg-yellow-100 text-yellow-800 border-yellow-200",
+          bad: "bg-red-100 text-red-800 border-red-200",
+          info: "bg-blue-100 text-blue-800 border-blue-200"
+        };
+        return <span class={cn("inline-flex items-center px-2.5 py-1 rounded-full text-xs border", map[tone] || map.neutral)}>{children}</span>;
+      }
+
+      function Modal({ open, onClose, title, children }) {
+        if (!open) return null;
+        return (
+          <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-black opacity-40" onClick={onClose}></div>
+            <div class="relative w-full max-w-2xl bg-white rounded-2xl shadow-xl border">
+              <div class="px-5 py-4 border-b flex items-center justify-between gap-3">
+                <div class="font-bold">{title}</div>
+                <button class="px-3 py-1.5 rounded-lg border hover:bg-gray-50" onClick={onClose}>סגור</button>
+              </div>
+              <div class="px-5 py-4">{children}</div>
+            </div>
+          </div>
+        );
+      }
+
+      function Hero() {
+        return (
+          <div class="bg-gradient-to-l from-gray-900 to-gray-700 text-white">
+            <div class="max-w-6xl mx-auto px-4 py-10">
+              <div class="text-3xl md:text-4xl font-extrabold leading-tight">
+                להבין מה מזיז את שוק העבודה עד 2030, ואז לדעת מה לעשות מחר בבוקר.
+              </div>
+              <div class="mt-3 text-gray-200 max-w-2xl">
+                זה לא אתר של “מיסטיקת קריירה”. זה MVP שמחבר מגמות, תפקידים ומיומנויות לתוכנית פעולה קצרה.
+              </div>
+
+              <div class="mt-6 grid grid-cols-1 md:grid-cols-4 gap-3">
+                <div class="bg-white bg-opacity-10 rounded-2xl p-4 border border-white border-opacity-10">
+                  <div class="text-xs text-gray-200">משרות צפויות להיווצר</div>
+                  <div class="text-2xl font-bold">{GLOBAL_HERO.jobsCreatedM}M</div>
+                </div>
+                <div class="bg-white bg-opacity-10 rounded-2xl p-4 border border-white border-opacity-10">
+                  <div class="text-xs text-gray-200">משרות צפויות להידחק</div>
+                  <div class="text-2xl font-bold">{GLOBAL_HERO.jobsDisplacedM}M</div>
+                </div>
+                <div class="bg-white bg-opacity-10 rounded-2xl p-4 border border-white border-opacity-10">
+                  <div class="text-xs text-gray-200">נטו עד 2030</div>
+                  <div class="text-2xl font-bold">{GLOBAL_HERO.netGrowthM}M</div>
+                </div>
+                <div class="bg-white bg-opacity-10 rounded-2xl p-4 border border-white border-opacity-10">
+                  <div class="text-xs text-gray-200">Churn מבני</div>
+                  <div class="text-2xl font-bold">{GLOBAL_HERO.churnPct}%</div>
+                </div>
+              </div>
+
+              <div class="mt-4 text-xs text-gray-300">
+                מקור: {REPORT_SOURCES[GLOBAL_HERO.sourceKey].ref}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      /* =========================
+         4) SCREENS
+         ========================= */
+
+      function ExploreScreen() {
+        return (
+          <div class="space-y-4">
+            <Card title="5 מנועי שינוי מרכזיים">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {MACROTRENDS.map(t => (
+                  <div key={t.id} class="border rounded-2xl p-4 hover:bg-gray-50 transition">
+                    <div class="flex items-center justify-between gap-2">
+                      <div class="font-bold text-lg">{t.title}</div>
+                      {t.sourceKey ? <Pill tone="info">מבוסס דוח</Pill> : <Pill>כללי</Pill>}
+                    </div>
+                    <div class="mt-2 text-sm text-gray-700">{t.what}</div>
+                    <div class="mt-2 text-sm text-gray-600"><span class="font-bold">למה זה חשוב: </span>{t.why}</div>
+
+                    <div class="mt-3 grid grid-cols-1 gap-2">
+                      <div class="text-xs text-gray-500">דוחף קדימה</div>
+                      <div class="flex flex-wrap gap-2">
+                        {t.pushes.roles.slice(0, 4).map(r => <Pill key={r} tone="neutral">{r}</Pill>)}
+                      </div>
+                      <div class="flex flex-wrap gap-2">
+                        {t.pushes.skills.slice(0, 4).map(s => <Pill key={s} tone="good">{s}</Pill>)}
+                      </div>
+                      {t.sourceKey && (
+                        <div class="mt-2 text-xs text-gray-500">מקור: {REPORT_SOURCES[t.sourceKey].ref}</div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+
+            <Card title="מה יוצא מזה לבן אדם אמיתי">
+              <div class="text-gray-700">
+                אם אתה לא יודע איפה להתחיל, תתחיל ב Skill-first: בחר 2-3 מיומנויות על, ובנה סביבן תיק עבודות קטן.
+                הרבה תפקידים זזים, אבל השוק לא “נחרב”, הוא משנה צורה.
+              </div>
+              <div class="mt-3 flex flex-wrap gap-2">
+                <Pill tone="good">AI וביג דאטה</Pill>
+                <Pill tone="good">חוסן וגמישות</Pill>
+                <Pill tone="good">סקרנות ולמידה מתמדת</Pill>
+                <Pill tone="good">חשיבה מערכתית</Pill>
+                <Pill tone="good">סייבר ורשתות</Pill>
+              </div>
+            </Card>
+          </div>
+        );
+      }
+
+      function CountryDashboardScreen() {
+        const [countryId, setCountryId] = useState("israel");
+        const country = useMemo(() => COUNTRIES.find(c => c.id === countryId), [countryId]);
+
+        return (
+          <div class="space-y-4">
+            <Card
+              title="דשבורד מדינה"
+              right={
+                <select class="border rounded-lg px-3 py-2" value={countryId} onChange={(e) => setCountryId(e.target.value)}>
+                  {COUNTRIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              }
+            >
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div class="border rounded-2xl p-4">
+                  <div class="text-xs text-gray-500">Labour-market churn (אם זמין)</div>
+                  <div class="text-2xl font-bold">{percentBadge(country.churnPct)}</div>
+                  {country.id === "israel" && <div class="mt-1 text-xs text-gray-500">מקור: {REPORT_SOURCES.israelProfileStats.ref}</div>}
+                </div>
+                <div class="border rounded-2xl p-4">
+                  <div class="text-xs text-gray-500">Skill disruption (אם זמין)</div>
+                  <div class="text-2xl font-bold">{percentBadge(country.skillDisruptionPct)}</div>
+                  {country.id === "israel" && <div class="mt-1 text-xs text-gray-500">מקור: {REPORT_SOURCES.israelProfileStats.ref}</div>}
+                </div>
+                <div class="border rounded-2xl p-4">
+                  <div class="text-xs text-gray-500">אזור</div>
+                  <div class="text-2xl font-bold">{country.region}</div>
+                  <div class="mt-1 text-xs text-gray-500">דמו MVP, הרחבה ל 55 מדינות בהמשך</div>
+                </div>
+              </div>
+
+              <div class="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <div class="font-bold mb-2">מה מזיז את המדינה הזו</div>
+                  <div class="space-y-2">
+                    {country.drivers.map((d, idx) => (
+                      <div key={idx} class="border rounded-2xl p-3">
+                        <div class="flex items-center justify-between gap-2">
+                          <div class="font-bold">{d.name}</div>
+                          {d.sourceKey ? <Pill tone="info">דוח</Pill> : <Pill>כללי</Pill>}
+                        </div>
+                        <div class="text-sm text-gray-600 mt-1">{d.note}</div>
+                        {d.sourceKey && <div class="text-xs text-gray-500 mt-2">מקור: {REPORT_SOURCES[d.sourceKey].ref}</div>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <div class="font-bold mb-2">מה מתחזק, ואיך מעסיקים מגיבים</div>
+
+                  <div class="border rounded-2xl p-3">
+                    <div class="text-xs text-gray-500">מיומנויות בעלייה</div>
+                    <div class="mt-2 flex flex-wrap gap-2">
+                      {country.risingSkills.map(s => <Pill key={s} tone="good">{s}</Pill>)}
+                    </div>
+                  </div>
+
+                  <div class="border rounded-2xl p-3 mt-3">
+                    <div class="text-xs text-gray-500">אסטרטגיות מעסיקים שכיחות</div>
+                    <ul class="mt-2 list-disc pr-5 text-sm text-gray-700 space-y-1">
+                      {country.employerStrategies.map((s, i) => <li key={i}>{s}</li>)}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            <CountryCompare />
+          </div>
+        );
+      }
+
+      function CountryCompare() {
+        const [a, setA] = useState("israel");
+        const [b, setB] = useState("usa");
+
+        const ca = COUNTRIES.find(c => c.id === a);
+        const cb = COUNTRIES.find(c => c.id === b);
+
+        const sharedSkills = useMemo(() => {
+          const setB = new Set(cb.risingSkills);
+          return ca.risingSkills.filter(s => setB.has(s));
+        }, [a, b]);
+
+        return (
+          <Card title="השוואת מדינות (MVP)">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div class="flex items-center gap-2">
+                <div class="text-sm text-gray-600">מדינה א</div>
+                <select class="border rounded-lg px-3 py-2" value={a} onChange={(e) => setA(e.target.value)}>
+                  {COUNTRIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div class="flex items-center gap-2">
+                <div class="text-sm text-gray-600">מדינה ב</div>
+                <select class="border rounded-lg px-3 py-2" value={b} onChange={(e) => setB(e.target.value)}>
+                  {COUNTRIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div class="border rounded-2xl p-3">
+                <div class="text-xs text-gray-500">מיומנויות א</div>
+                <div class="mt-2 flex flex-wrap gap-2">{ca.risingSkills.map(s => <Pill key={s} tone="good">{s}</Pill>)}</div>
+              </div>
+              <div class="border rounded-2xl p-3">
+                <div class="text-xs text-gray-500">חופף</div>
+                <div class="mt-2 flex flex-wrap gap-2">
+                  {sharedSkills.length ? sharedSkills.map(s => <Pill key={s} tone="info">{s}</Pill>) : <span class="text-sm text-gray-500">אין חפיפה בדמו</span>}
+                </div>
+              </div>
+              <div class="border rounded-2xl p-3">
+                <div class="text-xs text-gray-500">מיומנויות ב</div>
+                <div class="mt-2 flex flex-wrap gap-2">{cb.risingSkills.map(s => <Pill key={s} tone="good">{s}</Pill>)}</div>
+              </div>
+            </div>
+          </Card>
+        );
+      }
+
+      function RolesScreen() {
+        const [q, setQ] = useState("");
+        const [trend, setTrend] = useState("all");
+        const [family, setFamily] = useState("all");
+
+        const families = useMemo(() => ["all", ...uniq(ROLES.map(r => r.family))], []);
+        const filtered = useMemo(() => {
+          return ROLES.filter(r => {
+            const matchesQ = !q || r.name.toLowerCase().includes(q.toLowerCase());
+            const matchesTrend = trend === "all" || r.trend === trend;
+            const matchesFam = family === "all" || r.family === family;
+            return matchesQ && matchesTrend && matchesFam;
+          });
+        }, [q, trend, family]);
+
+        return (
+          <div class="space-y-4">
+            <Card
+              title="תפקידים: מי עולה ומי יורד (MVP)"
+              right={<Pill tone="info">מבוסס Fig 2.2</Pill>}
+            >
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <input
+                  class="border rounded-xl px-3 py-2"
+                  placeholder="חיפוש תפקיד"
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                />
+                <select class="border rounded-xl px-3 py-2" value={trend} onChange={(e) => setTrend(e.target.value)}>
+                  <option value="all">הכל</option>
+                  <option value="growing">בצמיחה</option>
+                  <option value="declining">בדעיכה</option>
+                </select>
+                <select class="border rounded-xl px-3 py-2" value={family} onChange={(e) => setFamily(e.target.value)}>
+                  {families.map(f => <option key={f} value={f}>{f === "all" ? "כל התחומים" : f}</option>)}
+                </select>
+              </div>
+
+              <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                {filtered.map(r => (
+                  <div key={r.id} class="border rounded-2xl p-4">
+                    <div class="flex items-center justify-between gap-2">
+                      <div class="font-bold">{r.name}</div>
+                      <Pill tone={r.trend === "growing" ? "good" : "bad"}>{r.trend === "growing" ? "צמיחה" : "דעיכה"}</Pill>
+                    </div>
+                    <div class="mt-2 text-sm text-gray-600">משפחה: {r.family}</div>
+                    <div class="mt-3 text-xs text-gray-500">מקור: {REPORT_SOURCES.rolesFastest.ref}</div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </div>
+        );
+      }
+
+      function SkillsScreen({ onPickSkill }) {
+        const [q, setQ] = useState("");
+        const filtered = useMemo(() => {
+          return SKILLS.filter(s =>
+            !q ||
+            s.name.toLowerCase().includes(q.toLowerCase()) ||
+            s.simple.toLowerCase().includes(q.toLowerCase())
+          );
+        }, [q]);
+
+        return (
+          <div class="space-y-4">
+            <Card title="מיומנויות: מה ללמוד בפועל">
+              <div class="flex flex-col md:flex-row gap-3">
+                <input
+                  class="border rounded-xl px-3 py-2 flex-1"
+                  placeholder="חפש מיומנות"
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                />
+                <div class="text-xs text-gray-500 self-center">
+                  טיפ: תחשוב Skill-first, ולא רק “מה התפקיד שלי”.
+                </div>
+              </div>
+
+              <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                {filtered.map(s => (
+                  <div key={s.id} class="border rounded-2xl p-4">
+                    <div class="flex items-center justify-between gap-2">
+                      <div class="font-bold text-lg">{s.name}</div>
+                      <button
+                        class="no-print px-3 py-1.5 rounded-lg border hover:bg-gray-50 text-sm"
+                        onClick={() => onPickSkill?.(s.id)}
+                      >
+                        הוסף לתוכנית
+                      </button>
+                    </div>
+                    <div class="mt-2 text-sm text-gray-700">{s.simple}</div>
+
+                    <div class="mt-3">
+                      <div class="text-xs text-gray-500">איך בודקים איפה אני עומד</div>
+                      <ul class="mt-2 list-disc pr-5 text-sm text-gray-700 space-y-1">
+                        {s.checks.map((c, i) => <li key={i}>{c}</li>)}
+                      </ul>
+                    </div>
+
+                    <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
+                      <div class="border rounded-xl p-3">
+                        <div class="text-xs text-gray-500">מסלול 4 שבועות</div>
+                        <ul class="mt-2 list-disc pr-5 text-sm text-gray-700 space-y-1">
+                          {s.paths["4w"].map((p, i) => <li key={i}>{p}</li>)}
+                        </ul>
+                      </div>
+                      <div class="border rounded-xl p-3">
+                        <div class="text-xs text-gray-500">מסלול 8 שבועות</div>
+                        <ul class="mt-2 list-disc pr-5 text-sm text-gray-700 space-y-1">
+                          {s.paths["8w"].map((p, i) => <li key={i}>{p}</li>)}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </div>
+        );
+      }
+
+      function PersonalPlanScreen() {
+        const [form, setForm] = useState({
+          countryId: "israel",
+          roleName: "Administrative Assistants and Executive Secretaries",
+          experience: "מיד",
+          orientation: "טכנולוגי",
+          hoursPerWeek: 4,
+          learningStyle: "פרויקטים",
+          selfRatings: {
+            ai_bigdata: 2,
+            resilience: 3,
+            curiosity: 3,
+            systems: 2,
+            cyber: 2
+          }
+        });
+
+        const [plan, setPlan] = useState(null);
+        const [whyOpen, setWhyOpen] = useState(false);
+
+        function update(path, value) {
+          setForm(prev => ({ ...prev, [path]: value }));
+        }
+
+        function updateRating(skillId, value) {
+          setForm(prev => ({
+            ...prev,
+            selfRatings: { ...prev.selfRatings, [skillId]: value }
+          }));
+        }
+
+        function generate() {
+          const p = buildPlan(form);
+          setPlan(p);
+          setWhyOpen(false);
+        }
+
+        const selectedCountry = COUNTRIES.find(c => c.id === form.countryId);
+
+        return (
+          <div class="space-y-4 print-area">
+            <Card
+              title="המסלול שלי: שאלון קצר (עד 2 דקות)"
+              right={
+                <div class="flex items-center gap-2">
+                  <button
+                    class="no-print px-3 py-2 rounded-xl bg-gray-900 text-white hover:bg-gray-800"
+                    onClick={generate}
+                  >
+                    הפק תוכנית
+                  </button>
+                  <button
+                    class="no-print px-3 py-2 rounded-xl border hover:bg-gray-50"
+                    onClick={() => window.print()}
+                    disabled={!plan}
+                    title={!plan ? "תייצר תוכנית קודם" : "הדפסה ל PDF דרך הדפדפן"}
+                  >
+                    הדפסה ל PDF
+                  </button>
+                </div>
+              }
+            >
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <div class="text-xs text-gray-500 mb-1">מדינה</div>
+                  <select class="border rounded-xl px-3 py-2 w-full" value={form.countryId} onChange={(e) => update("countryId", e.target.value)}>
+                    {COUNTRIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <div class="text-xs text-gray-500 mb-1">תפקיד</div>
+                  <select class="border rounded-xl px-3 py-2 w-full" value={form.roleName} onChange={(e) => update("roleName", e.target.value)}>
+                    {ROLES.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <div class="text-xs text-gray-500 mb-1">רמת ניסיון</div>
+                  <select class="border rounded-xl px-3 py-2 w-full" value={form.experience} onChange={(e) => update("experience", e.target.value)}>
+                    <option>ג׳וניור</option>
+                    <option>מיד</option>
+                    <option>סניור</option>
+                  </select>
+                </div>
+
+                <div>
+                  <div class="text-xs text-gray-500 mb-1">נטייה</div>
+                  <select class="border rounded-xl px-3 py-2 w-full" value={form.orientation} onChange={(e) => update("orientation", e.target.value)}>
+                    <option>טכנולוגי</option>
+                    <option>אנשים</option>
+                    <option>תפעול</option>
+                    <option>יצירתי</option>
+                  </select>
+                </div>
+
+                <div>
+                  <div class="text-xs text-gray-500 mb-1">שעות בשבוע</div>
+                  <input
+                    type="number"
+                    min="1"
+                    max="20"
+                    class="border rounded-xl px-3 py-2 w-full"
+                    value={form.hoursPerWeek}
+                    onChange={(e) => update("hoursPerWeek", Number(e.target.value))}
+                  />
+                </div>
+
+                <div>
+                  <div class="text-xs text-gray-500 mb-1">סגנון למידה</div>
+                  <select class="border rounded-xl px-3 py-2 w-full" value={form.learningStyle} onChange={(e) => update("learningStyle", e.target.value)}>
+                    <option>עצמאי</option>
+                    <option>קורס</option>
+                    <option>מנטורינג</option>
+                    <option>פרויקטים</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="mt-5 border rounded-2xl p-4">
+                <div class="font-bold">דירוג עצמי מהיר (1 נמוך, 5 גבוה)</div>
+                <div class="text-sm text-gray-600 mt-1">
+                  לא “מבחן”. רק כדי לחשב פערי מיומנויות בצורה שקופה.
+                </div>
+
+                <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {SKILLS.map(s => (
+                    <div key={s.id} class="border rounded-2xl p-3">
+                      <div class="flex items-center justify-between gap-2">
+                        <div class="font-bold">{s.name}</div>
+                        <Pill tone="neutral">{form.selfRatings[s.id] || 0}/5</Pill>
+                      </div>
+                      <input
+                        type="range"
+                        min="1"
+                        max="5"
+                        value={form.selfRatings[s.id] || 1}
+                        class="w-full mt-3"
+                        onChange={(e) => updateRating(s.id, Number(e.target.value))}
+                      />
+                      <div class="text-xs text-gray-500 mt-2">{s.simple}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {selectedCountry?.id === "israel" && (
+                <div class="mt-4 text-xs text-gray-500">
+                  הערת דמו: ישראל כוללת כאן גם churn ו skill disruption כדי להדגים “Country Dashboard” אמיתי.
+                </div>
+              )}
+            </Card>
+
+            {plan && (
+              <Card
+                title="הדוח האישי שלך"
+                right={
+                  <button class="no-print px-3 py-2 rounded-xl border hover:bg-gray-50" onClick={() => setWhyOpen(true)}>
+                    למה המלצת את זה?
+                  </button>
+                }
+              >
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <ScoreBox title="רמת סיכון לשחיקה של התפקיד" score={plan.scores.overallRisk} />
+                  <ScoreBox title="חשיפה לשינוי טכנולוגי" score={plan.scores.exposure} hint={`עוגן: ${REPORT_SOURCES.aiTransform.ref}`} />
+                  <ScoreBox title="פער מיומנויות" score={plan.scores.gapScore} />
+                </div>
+
+                <div class="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div class="border rounded-2xl p-4">
+                    <div class="font-bold">3 מיומנויות חובה ל 6 חודשים</div>
+                    <div class="mt-3 flex flex-wrap gap-2">
+                      {plan.outputs.topSkills.map(id => {
+                        const s = SKILLS.find(x => x.id === id);
+                        return <Pill key={id} tone="good">{s?.name || id}</Pill>;
+                      })}
+                    </div>
+
+                    <div class="mt-4 text-sm text-gray-700">
+                      עיקרון: “סט מינימלי לרלוונטיות”, ואז להעמיק.
+                    </div>
+                  </div>
+
+                  <div class="border rounded-2xl p-4">
+                    <div class="font-bold">2 פרויקטים מומלצים לתיק עבודות</div>
+                    <div class="mt-3 space-y-3">
+                      {plan.outputs.projects.map((p, i) => (
+                        <div key={i} class="border rounded-2xl p-3">
+                          <div class="flex items-center justify-between gap-2">
+                            <div class="font-bold">{p.title}</div>
+                            <Pill tone="info">{p.time}</Pill>
+                          </div>
+                          <div class="text-sm text-gray-700 mt-1">{p.desc}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div class="mt-4 border rounded-2xl p-4">
+                  <div class="font-bold">כיוון תפקידים סמוכים (Adjacent roles)</div>
+                  <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {plan.outputs.adjacent.slice(0, 2).map((ar, i) => (
+                      <div key={i} class="border rounded-2xl p-3">
+                        <div class="font-bold">{ar.name}</div>
+                        <div class="text-sm text-gray-700 mt-1">{ar.why}</div>
+                        <div class="mt-2 flex flex-wrap gap-2">
+                          {ar.skills.map(sid => {
+                            const s = SKILLS.find(x => x.id === sid);
+                            return <Pill key={sid} tone="neutral">{s?.name || sid}</Pill>;
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div class="mt-4 text-xs text-gray-500">
+                    הקשר: השוק זז, לא נעלם. נטו יש צמיחה, אבל הרבה תנועה מבנית.
+                    מקור: {REPORT_SOURCES.globalChurn.ref}
+                  </div>
+                </div>
+
+                <Modal open={whyOpen} onClose={() => setWhyOpen(false)} title="למה המלצת את זה? (שקיפות)">
+                  <div class="space-y-3">
+                    {plan.explain.map((x, i) => (
+                      <div key={i} class="border rounded-2xl p-4">
+                        <div class="flex items-center justify-between gap-2">
+                          <div class="font-bold">{x.title}</div>
+                          <Pill tone="info">מקור</Pill>
+                        </div>
+                        <div class="text-sm text-gray-700 mt-2">{x.text}</div>
+                        <div class="text-xs text-gray-500 mt-2">{x.source.ref}</div>
+                      </div>
+                    ))}
+                  </div>
+                </Modal>
+              </Card>
+            )}
+          </div>
+        );
+      }
+
+      function ScoreBox({ title, score, hint }) {
+        const badge = scoreToLabel(score);
+        return (
+          <div class="border rounded-2xl p-4">
+            <div class="text-xs text-gray-500">{title}</div>
+            <div class="mt-2 flex items-center justify-between gap-2">
+              <div class={cn("px-2.5 py-1 rounded-full text-xs border", badge.color)}>
+                {badge.label}
+              </div>
+              <div class="text-2xl font-bold">{score}</div>
+            </div>
+            {hint && <div class="mt-2 text-xs text-gray-500">{hint}</div>}
+          </div>
+        );
+      }
+
+      /* =========================
+         5) APP
+         ========================= */
+
+      function App() {
+        const [route, setRoute] = useState("explore");
+        const [prefillSkillId, setPrefillSkillId] = useState(null);
+
+        useEffect(() => {
+          if (route !== "skills") setPrefillSkillId(null);
+        }, [route]);
+
+        return (
+          <div>
+            <TopNav route={route} setRoute={setRoute} />
+            <Hero />
+
+            <div class="max-w-6xl mx-auto px-4 py-6 space-y-4">
+              {route === "explore" && <ExploreScreen />}
+              {route === "country" && <CountryDashboardScreen />}
+              {route === "roles" && <RolesScreen />}
+              {route === "skills" && <SkillsScreen onPickSkill={(id) => {
+                // Tiny “product feel”: jumping user to plan could be next iteration.
+                setPrefillSkillId(id);
+                alert("הוספה לתוכנית במלואה תיכנס בגרסה הבאה. כרגע, קח את המיומנות הזו כהמלצה להעלות דירוג עצמי במסלול.");
+              }} />}
+              {route === "plan" && <PersonalPlanScreen prefillSkillId={prefillSkillId} />}
+
+              <div class="no-print text-xs text-gray-500 pt-4 border-t">
+                MVP הערה: כרגע יש 3 מדינות לדמו וסט קטן של תפקידים ומיומנויות. הרחבה ל 55 מדינות וקטלוג מלא היא בעיקר עבודת דאטה.
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      const root = ReactDOM.createRoot(document.getElementById("root"));
+      root.render(<App />);
+    </script>
+  </body>
+</html>
